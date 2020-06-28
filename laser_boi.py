@@ -139,7 +139,6 @@ class Laserboi(BaseScript):
 			self.game.read_game_information(packet, None)
 
 			for v in self.car_lasers.values():
-				print(v)
 				v.time_remaining -= elapsed_now
 
 			if TWITCH_CHAT_INTERACTION:
