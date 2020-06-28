@@ -61,8 +61,6 @@ if TWITCH_CHAT_INTERACTION:
 
 
 
-import timeit
-
 
 class Laserboi(BaseScript):
 
@@ -256,7 +254,6 @@ class Laserboi(BaseScript):
 									int(255 * (0.5 + 0.5 * math.sin(packet.game_cars[index].physics.rotation.roll + leftRight * i + (COLORSPIN * packet.game_info.seconds_elapsed + 2 / 3 * math.pi)))),
 									int(255 * (0.5 + 0.5 * math.sin(packet.game_cars[index].physics.rotation.roll + leftRight * i + (COLORSPIN * packet.game_info.seconds_elapsed + 4 / 3 * math.pi))))
 								)
-								start_time = timeit.default_timer()
 								self.renderer.draw_line_3d(startPoint + offset, startPoint + offset + closest * direction, color)
 							
 							for _ in range(SCATTERLINES):
@@ -272,7 +269,6 @@ class Laserboi(BaseScript):
 								length = 15 * math.exp(-fastrand.pcg32bounded(2**10) / 2**10)
 								scatterStart = startPoint + closest * direction + dot(look_at(direction, vec3(0, 0, 1)), vec3(0, R * math.sin(i), R * math.cos(i)))
 								scatterEnd = scatterStart + dot(look_at(endVector, vec3(0, 0, 1)), vec3(-length, length * math.sin(i), length * math.cos(i)))
-								start_time = timeit.default_timer()
 								self.renderer.draw_line_3d(scatterStart, scatterEnd, color)
 							
 
