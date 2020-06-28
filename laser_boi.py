@@ -75,7 +75,8 @@ class Laserboi(BaseScript):
 		self.last_seconds_elapsed = 0
 		self.forces = {}
 		self.lastScore = 0
-		self.isPaused = False
+		self.isKickoff = -3
+		self.isPaused = True
 		self.boostContent = {}
 		self.boost = {}
 
@@ -138,9 +139,6 @@ class Laserboi(BaseScript):
 			
 			self.game.read_game_information(packet, None)
 
-			for v in self.car_lasers.values():
-				v.time_remaining -= elapsed_now
-
 			if TWITCH_CHAT_INTERACTION:
 				self.car_lasers = {k:v for k, v in self.car_lasers.items() if v.time_remaining >= 0}
 			else:
@@ -151,8 +149,11 @@ class Laserboi(BaseScript):
 			if packet.teams[0].score - packet.teams[1].score != self.lastScore:
 				self.isPaused = True
 				self.lastScore = packet.teams[0].score - packet.teams[1].score
+				self.isKickoff = 0
 			elif self.game.ball.position[0] == 0 and self.game.ball.position[1] == 0 and self.game.ball.velocity[0] == 0 and self.game.ball.velocity[1] == 0:
-				self.isPaused = False
+				self.isKickoff += elapsed_now
+				if self.isKickoff >= 4:
+					self.isPaused = False
 			
 			ballTouchers = []
 			random.seed(a=int(packet.game_info.seconds_elapsed / .14))
@@ -162,7 +163,7 @@ class Laserboi(BaseScript):
 				boostContent = {}
 				for i in range(self.game.num_cars):
 					car = self.game.cars[i]
-					boosting[i] = i in self.boostContent and (3 if self.boostContent[i] > car.boost or (self.boostContent[i] < car.boost and self.boosting[i]) else max(0, self.boosting[i] - 1))
+					boosting[i] = i in self.boostContent and (6 if self.boostContent[i] > car.boost or (self.boostContent[i] < car.boost and self.boosting[i]) else max(0, self.boosting[i] - 1))
 					boostContent[i] = car.boost
 				self.boosting = boosting
 				self.boostContent = boostContent
@@ -172,122 +173,128 @@ class Laserboi(BaseScript):
 
 				self.renderer.begin_rendering(str(index) + "Lb")
 				
-				if index in self.car_lasers and not packet.game_cars[index].is_demolished and (not DURING_BOOST_ONLY or self.boosting[index]):# and not self.isPaused:
-					for leftRight in (-1, 1):
-						startPoint = car.position + car.forward() * 63 + leftRight * car.left() * 26 + car.up() * 3
-						direction = normalize(orthogonalize(car.forward(), vec3(0, 0, 1))) if car.on_ground and abs(dot(car.up(), vec3(0, 0, 1))) > 0.999 else car.forward()
+				if index in self.car_lasers:
+					laser = self.car_lasers[index]
+					if not packet.game_cars[index].is_demolished and (not DURING_BOOST_ONLY or self.boosting[index]):# and not self.isPaused:
+						if not self.isPaused:
+							laser.time_remaining -= elapsed_now
+						if laser.time_remaining >= 0:
+							for leftRight in (-1, 1):
+								startPoint = car.position + car.forward() * 63 + leftRight * car.left() * 26 + car.up() * 3
+								direction = normalize(orthogonalize(car.forward(), vec3(0, 0, 1))) if car.on_ground and abs(dot(car.up(), vec3(0, 0, 1))) > 0.999 else car.forward()
 
-						for bounce in range(1):
-							closest = math.inf
-							closestTarget = None
-							toBall = self.game.ball.position - car.position
-							toBallProj = project(toBall, direction)
-							toBallOrth = toBall - toBallProj
-							toCollisionOrth = toBallOrth
-							endVector = direction
-							if norm(toBallOrth) <= self.game.ball.radius and dot(toBallProj, direction) > 0:
-								closestTarget = -1
-								closest = norm(toBallProj) - math.sqrt(self.game.ball.radius**2 - norm(toBallOrth)**2)
-								ballTouchers.append(index)
+								for bounce in range(1):
+									closest = math.inf
+									closestTarget = None
+									toBall = self.game.ball.position - car.position
+									toBallProj = project(toBall, direction)
+									toBallOrth = toBall - toBallProj
+									toCollisionOrth = toBallOrth
+									endVector = direction
+									if norm(toBallOrth) <= self.game.ball.radius and dot(toBallProj, direction) > 0:
+										closestTarget = -1
+										closest = norm(toBallProj) - math.sqrt(self.game.ball.radius**2 - norm(toBallOrth)**2)
+										ballTouchers.append(index)
 
-							for otherIndex in range(self.game.num_cars):
-								if otherIndex == index:
-									continue
-								otherCar = self.game.cars[otherIndex]
-								
-								v_local = dot(startPoint - otherCar.hitbox().center + 15 * otherCar.up(), otherCar.hitbox().orientation)
-								d_local = dot(direction, otherCar.hitbox().orientation)
-								def lineFaceCollision(i):
-									offset = vec3(0, 0, 0)
-									offset[i] = math.copysign(otherCar.hitbox().half_width[i], -d_local[i])
-									collisionPoint = v_local - offset
-									try:
-										distance = -collisionPoint[i] / d_local[i]
-									except ZeroDivisionError:
-										return None
-									if distance < 0:
-										return None
-									collisionPoint += d_local * distance
-									for j in range(i == 0, 3 - (i == 2), 1 + (i == 1)):
-										if abs(collisionPoint[j]) > otherCar.hitbox().half_width[j]:
-											return None
-									collisionPoint[i] = offset[i]
-									# print(dot(otherCar.hitbox().orientation, collisionPoint) + otherCar.hitbox().center - 15 * otherCar.up())
-									return distance
-								distance = lineFaceCollision(0) or lineFaceCollision(1) or lineFaceCollision(2)
-								if distance is not None:
-									# collisionPoint = dot(otherCar.hitbox().orientation, collisionPoint) + otherCar.hitbox().center
-									collisionPoint = startPoint + distance * direction
-									toCollisionOrth = orthogonalize(collisionPoint - startPoint, direction)
-									if distance < closest:
-										closest = distance
-										closestTarget = otherIndex
+									for otherIndex in range(self.game.num_cars):
+										if otherIndex == index:
+											continue
+										otherCar = self.game.cars[otherIndex]
+										
+										v_local = dot(startPoint - otherCar.hitbox().center + 15 * otherCar.up(), otherCar.hitbox().orientation)
+										d_local = dot(direction, otherCar.hitbox().orientation)
+										def lineFaceCollision(i):
+											offset = vec3(0, 0, 0)
+											offset[i] = math.copysign(otherCar.hitbox().half_width[i], -d_local[i])
+											collisionPoint = v_local - offset
+											try:
+												distance = -collisionPoint[i] / d_local[i]
+											except ZeroDivisionError:
+												return None
+											if distance < 0:
+												return None
+											collisionPoint += d_local * distance
+											for j in range(i == 0, 3 - (i == 2), 1 + (i == 1)):
+												if abs(collisionPoint[j]) > otherCar.hitbox().half_width[j]:
+													return None
+											collisionPoint[i] = offset[i]
+											# print(dot(otherCar.hitbox().orientation, collisionPoint) + otherCar.hitbox().center - 15 * otherCar.up())
+											return distance
+										distance = lineFaceCollision(0) or lineFaceCollision(1) or lineFaceCollision(2)
+										if distance is not None:
+											# collisionPoint = dot(otherCar.hitbox().orientation, collisionPoint) + otherCar.hitbox().center
+											collisionPoint = startPoint + distance * direction
+											toCollisionOrth = orthogonalize(collisionPoint - startPoint, direction)
+											if distance < closest:
+												closest = distance
+												closestTarget = otherIndex
 
 
-							if closestTarget is not None:
-								if closestTarget not in self.forces:
-									self.forces[closestTarget] = Push()
-								self.forces[closestTarget].velocity += direction * elapsed_now
-								self.forces[closestTarget].angular_velocity += toCollisionOrth * -1 * direction / norm(toCollisionOrth)**2 * elapsed_now
-								pass
-							else:
-								# simulate raycast closest
-								length = 100000
-								ray = Ray(startPoint, direction * length)
-								while closest >= length + .2:
-									closest = length
-									newStartPoint, mirrorDirection = ray.start, ray.direction
-									ray = Field.raycast_any(Ray(startPoint, direction * (length - .1)))
-									length = norm(ray.start - startPoint)
-								newDirection = direction - 2 * dot(direction, mirrorDirection) * mirrorDirection
-								endVector = direction * 0.6 - mirrorDirection * 0.4
-							
-							R = 4
-							COLORSPIN = 2
-							SCATTERSPIN = 0.75
-							for i in range(LASERLINES):
-								i = i / LASERLINES * 2 * math.pi
-								offset = dot(look_at(direction, vec3(0, 0, 1)), vec3(0, R * math.sin(i), R * math.cos(i)))
-								color = self.renderer.create_color(255, 
-									int(255 * (0.5 + 0.5 * math.sin(packet.game_cars[index].physics.rotation.roll + leftRight * i + (COLORSPIN * packet.game_info.seconds_elapsed)))),
-									int(255 * (0.5 + 0.5 * math.sin(packet.game_cars[index].physics.rotation.roll + leftRight * i + (COLORSPIN * packet.game_info.seconds_elapsed + 2 / 3 * math.pi)))),
-									int(255 * (0.5 + 0.5 * math.sin(packet.game_cars[index].physics.rotation.roll + leftRight * i + (COLORSPIN * packet.game_info.seconds_elapsed + 4 / 3 * math.pi))))
-								)
-								self.renderer.draw_line_3d(startPoint + offset, startPoint + offset + closest * direction, color)
-							
-							for _ in range(SCATTERLINES):
-								r = random.uniform(0, 2 * math.pi)
-								c = leftRight * r - (SCATTERSPIN - COLORSPIN) * packet.game_info.seconds_elapsed
-								i = packet.game_cars[index].physics.rotation.roll + r - leftRight * (SCATTERSPIN) * packet.game_info.seconds_elapsed
-								# c = random.uniform(0, 2 * math.pi)
-								color = self.renderer.create_color(255, 
-									int(255 * (0.5 + 0.5 * math.sin(c))),
-									int(255 * (0.5 + 0.5 * math.sin(c + 2 / 3 * math.pi))),
-									int(255 * (0.5 + 0.5 * math.sin(c + 4 / 3 * math.pi)))
-								)
-								length = 15 * random.expovariate(1)
-								scatterStart = startPoint + closest * direction + dot(look_at(direction, vec3(0, 0, 1)), vec3(0, R * math.sin(i), R * math.cos(i)))
-								scatterEnd = scatterStart + dot(look_at(endVector, vec3(0, 0, 1)), vec3(-length, length * math.sin(i), length * math.cos(i)))
-								self.renderer.draw_line_3d(scatterStart, scatterEnd, color)
-							
+									if closestTarget is not None:
+										if closestTarget not in self.forces:
+											self.forces[closestTarget] = Push()
+										self.forces[closestTarget].velocity += direction * elapsed_now
+										self.forces[closestTarget].angular_velocity += toCollisionOrth * -1 * direction / norm(toCollisionOrth)**2 * elapsed_now
+										pass
+									else:
+										# simulate raycast closest
+										length = 100000
+										ray = Ray(startPoint, direction * length)
+										while closest >= length + .2:
+											closest = length
+											newStartPoint, mirrorDirection = ray.start, ray.direction
+											ray = Field.raycast_any(Ray(startPoint, direction * (length - .1)))
+											length = norm(ray.start - startPoint)
+										newDirection = direction - 2 * dot(direction, mirrorDirection) * mirrorDirection
+										endVector = direction * 0.6 - mirrorDirection * 0.4
+									
+									R = 4
+									COLORSPIN = 2
+									SCATTERSPIN = 0.75
+									for i in range(LASERLINES):
+										i = i / LASERLINES * 2 * math.pi
+										offset = dot(look_at(direction, vec3(0, 0, 1)), vec3(0, R * math.sin(i), R * math.cos(i)))
+										color = self.renderer.create_color(255, 
+											int(255 * (0.5 + 0.5 * math.sin(packet.game_cars[index].physics.rotation.roll + leftRight * i + (COLORSPIN * packet.game_info.seconds_elapsed)))),
+											int(255 * (0.5 + 0.5 * math.sin(packet.game_cars[index].physics.rotation.roll + leftRight * i + (COLORSPIN * packet.game_info.seconds_elapsed + 2 / 3 * math.pi)))),
+											int(255 * (0.5 + 0.5 * math.sin(packet.game_cars[index].physics.rotation.roll + leftRight * i + (COLORSPIN * packet.game_info.seconds_elapsed + 4 / 3 * math.pi))))
+										)
+										self.renderer.draw_line_3d(startPoint + offset, startPoint + offset + closest * direction, color)
+									
+									for _ in range(SCATTERLINES):
+										r = random.uniform(0, 2 * math.pi)
+										c = leftRight * r - (SCATTERSPIN - COLORSPIN) * packet.game_info.seconds_elapsed
+										i = packet.game_cars[index].physics.rotation.roll + r - leftRight * (SCATTERSPIN) * packet.game_info.seconds_elapsed
+										# c = random.uniform(0, 2 * math.pi)
+										color = self.renderer.create_color(255, 
+											int(255 * (0.5 + 0.5 * math.sin(c))),
+											int(255 * (0.5 + 0.5 * math.sin(c + 2 / 3 * math.pi))),
+											int(255 * (0.5 + 0.5 * math.sin(c + 4 / 3 * math.pi)))
+										)
+										length = 15 * random.expovariate(1)
+										scatterStart = startPoint + closest * direction + dot(look_at(direction, vec3(0, 0, 1)), vec3(0, R * math.sin(i), R * math.cos(i)))
+										scatterEnd = scatterStart + dot(look_at(endVector, vec3(0, 0, 1)), vec3(-length, length * math.sin(i), length * math.cos(i)))
+										self.renderer.draw_line_3d(scatterStart, scatterEnd, color)
+									
 
-							if closestTarget is not None:
-								break
-							else:
-								startPoint, direction = newStartPoint + 0.1 * newDirection, newDirection
+									if closestTarget is not None:
+										break
+									else:
+										startPoint, direction = newStartPoint + 0.1 * newDirection, newDirection
 
 				self.renderer.end_rendering()
 				self.lastBallPos = self.game.ball.position
 
 			ballState = None
 			if -1 in self.forces:
-				ballState = BallState(
-					# latest_touch=Touch(player_name=packet.game_cars[random.choice(ballTouchers)].name),
-					physics=Physics(
-						velocity=toVector3(self.game.ball.velocity + self.forces[-1].velocity * PUSH_STRENGTH_BALL),
-						angular_velocity=toVector3(self.game.ball.angular_velocity + self.forces[-1].angular_velocity * PUSH_STRENGTH_BALL_ANGULAR)
+				if not self.isPaused:
+					ballState = BallState(
+						# latest_touch=Touch(player_name=packet.game_cars[random.choice(ballTouchers)].name),
+						physics=Physics(
+							velocity=toVector3(self.game.ball.velocity + self.forces[-1].velocity * PUSH_STRENGTH_BALL),
+							angular_velocity=toVector3(self.game.ball.angular_velocity + self.forces[-1].angular_velocity * PUSH_STRENGTH_BALL_ANGULAR)
+						)
 					)
-				)
 				del self.forces[-1]
 			carStates = {}
 			for i, force in self.forces.items():
