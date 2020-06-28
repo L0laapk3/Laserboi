@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from rlutilities.linear_algebra import euler_to_rotation, dot, transpose, look_at, vec2, vec3, norm, normalize, angle_between, orthogonalize, project
 from rlutilities.simulation import Ball, Field, Game, Car, ray as Ray
 from rlutilities.mechanics import ReorientML
-import math, random
+import math, fastrand
 
 PUSH_STRENGTH_BALL = BASE_PUSH_STRENGTH * 4
 PUSH_STRENGTH_BALL_ANGULAR = BASE_PUSH_STRENGTH * 20
@@ -57,9 +57,11 @@ if TWITCH_CHAT_INTERACTION:
 
 		def set_action(self, choice: ActionChoice):
 			self.script.process_choice(choice.action)
-			return ApiResponse(200, f"The monkey shall {choice.action.description}")
+			return ApiResponse(200, f"{choice.action.description}")
 
 
+
+import timeit
 
 
 class Laserboi(BaseScript):
@@ -71,7 +73,7 @@ class Laserboi(BaseScript):
 		self.known_players: List[PlayerInfo] = []
 		self.game = Game()
 		self.game.set_mode("soccar")
-		self.car_lasers = { }
+		self.car_lasers = { 0: Laser(0, 20) }
 		self.last_seconds_elapsed = 0
 		self.forces = {}
 		self.lastScore = 0
@@ -79,12 +81,16 @@ class Laserboi(BaseScript):
 		self.boostContent = {}
 		self.boost = {}
 
+		self.lastFullSecond = 0
+		self.ticksThisSecond = 0
+
 	def heartbeat_connection_attempts_to_twitch_broker(self, port):
 		if TWITCH_CHAT_INTERACTION:
 			register_api_config = Configuration()
 			register_api_config.host = f"http://127.0.0.1:{STANDARD_TWITCH_BROKER_PORT}"
 			twitch_broker_register = RegisterApi(ApiClient(configuration=register_api_config))
 			while True:
+				print("shit is running!")
 				try:
 					twitch_broker_register.register_action_server(
 						ActionServerRegistration(base_url=f"http://127.0.0.1:{port}"))
@@ -101,7 +107,8 @@ class Laserboi(BaseScript):
 			if player_index is None:
 				return
 
-			self.car_lasers.clear()
+			if not ALLOW_MULTIPLE_AT_ONCE:
+				self.car_lasers.clear()
 			self.car_lasers[player_index] = Laser(0, LASER_DURATION)
 
 
@@ -112,9 +119,10 @@ class Laserboi(BaseScript):
 			Thread(target=run_action_server, args=(port,), daemon=True).start()
 			set_bot_action_broker(self.action_broker)  # This seems to only work after the bot hot reloads once, weird.
 
-			Thread(target=self.heartbeat_connection_attempts_to_twitch_broker, args=(port,), daemon=True).start()
+			Thread(target=self.heartbeat_connection_attempts_to_twitch_broker, args=(port,)).start()
 
 		while True:
+			sleep(0)
 			packet = self.wait_game_tick_packet()
 			raw_players = [self.game_tick_packet.game_cars[i]
 						   for i in range(packet.num_cars)]
@@ -123,11 +131,21 @@ class Laserboi(BaseScript):
 				continue
 			elapsed_now = packet.game_info.seconds_elapsed - self.last_seconds_elapsed
 			self.last_seconds_elapsed = packet.game_info.seconds_elapsed
+
+			self.ticksThisSecond += 1
+			if int(packet.game_info.seconds_elapsed) != self.lastFullSecond:
+				print("ticks this second:", self.ticksThisSecond)
+				self.ticksThisSecond = 0
+				self.lastFullSecond = int(packet.game_info.seconds_elapsed)
 			
 			self.game.read_game_information(packet, None)
 
+			for v in self.car_lasers.values():
+				print(v)
+				v.time_remaining -= elapsed_now
+
 			if TWITCH_CHAT_INTERACTION:
-				self.car_lasers = {k:v for k, v in self.car_lasers.items() if v.expires_at >= packet.game_info.seconds_elapsed}
+				self.car_lasers = {k:v for k, v in self.car_lasers.items() if v.time_remaining >= 0}
 			else:
 				self.car_lasers = {}
 				for i in range(self.game.num_cars):
@@ -140,7 +158,7 @@ class Laserboi(BaseScript):
 				self.isPaused = False
 			
 			ballTouchers = []
-			random.seed(a=int(packet.game_info.seconds_elapsed / .14))
+			fastrand.pcg32_seed(int(packet.game_info.seconds_elapsed / .14))
 
 			if DURING_BOOST_ONLY:
 				boosting = {}
@@ -152,13 +170,12 @@ class Laserboi(BaseScript):
 				self.boosting = boosting
 				self.boostContent = boostContent
 
-
-			for index, l in self.car_lasers.items():
+			for index in range(self.game.num_cars):
 				car = self.game.cars[index]
 
 				self.renderer.begin_rendering(str(index) + "Lb")
 				
-				if not packet.game_cars[index].is_demolished and (not DURING_BOOST_ONLY or self.boosting[index]):# and not self.isPaused:
+				if index in self.car_lasers and not packet.game_cars[index].is_demolished and (not DURING_BOOST_ONLY or self.boosting[index]):# and not self.isPaused:
 					for leftRight in (-1, 1):
 						startPoint = car.position + car.forward() * 63 + leftRight * car.left() * 26 + car.up() * 3
 						direction = normalize(orthogonalize(car.forward(), vec3(0, 0, 1))) if car.on_ground and abs(dot(car.up(), vec3(0, 0, 1))) > 0.999 else car.forward()
@@ -239,10 +256,11 @@ class Laserboi(BaseScript):
 									int(255 * (0.5 + 0.5 * math.sin(packet.game_cars[index].physics.rotation.roll + leftRight * i + (COLORSPIN * packet.game_info.seconds_elapsed + 2 / 3 * math.pi)))),
 									int(255 * (0.5 + 0.5 * math.sin(packet.game_cars[index].physics.rotation.roll + leftRight * i + (COLORSPIN * packet.game_info.seconds_elapsed + 4 / 3 * math.pi))))
 								)
+								start_time = timeit.default_timer()
 								self.renderer.draw_line_3d(startPoint + offset, startPoint + offset + closest * direction, color)
 							
 							for _ in range(SCATTERLINES):
-								r = random.uniform(0, 2 * math.pi)
+								r = fastrand.pcg32bounded(int(2 * math.pi * 2**10)) / 2**10
 								c = leftRight * r - (SCATTERSPIN - COLORSPIN) * packet.game_info.seconds_elapsed
 								i = packet.game_cars[index].physics.rotation.roll + r - leftRight * (SCATTERSPIN) * packet.game_info.seconds_elapsed
 								# c = random.uniform(0, 2 * math.pi)
@@ -251,11 +269,13 @@ class Laserboi(BaseScript):
 									int(255 * (0.5 + 0.5 * math.sin(c + 2 / 3 * math.pi))),
 									int(255 * (0.5 + 0.5 * math.sin(c + 4 / 3 * math.pi)))
 								)
-								length = 15 * random.expovariate(1)
+								length = 15 * math.exp(-fastrand.pcg32bounded(2**10) / 2**10)
 								scatterStart = startPoint + closest * direction + dot(look_at(direction, vec3(0, 0, 1)), vec3(0, R * math.sin(i), R * math.cos(i)))
 								scatterEnd = scatterStart + dot(look_at(endVector, vec3(0, 0, 1)), vec3(-length, length * math.sin(i), length * math.cos(i)))
+								start_time = timeit.default_timer()
 								self.renderer.draw_line_3d(scatterStart, scatterEnd, color)
 							
+
 							if closestTarget is not None:
 								break
 							else:
@@ -263,7 +283,6 @@ class Laserboi(BaseScript):
 
 				self.renderer.end_rendering()
 				self.lastBallPos = self.game.ball.position
-
 
 			ballState = None
 			if -1 in self.forces:
@@ -283,6 +302,7 @@ class Laserboi(BaseScript):
 				))
 			self.forces.clear()
 			self.set_game_state(GameState(cars=carStates, ball=ballState))
+			
 				
 			
 
