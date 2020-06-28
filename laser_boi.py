@@ -73,7 +73,7 @@ class Laserboi(BaseScript):
 		self.known_players: List[PlayerInfo] = []
 		self.game = Game()
 		self.game.set_mode("soccar")
-		self.car_lasers = { 0: Laser(0, 20) }
+		self.car_lasers = { }
 		self.last_seconds_elapsed = 0
 		self.forces = {}
 		self.lastScore = 0
@@ -119,7 +119,7 @@ class Laserboi(BaseScript):
 			Thread(target=run_action_server, args=(port,), daemon=True).start()
 			set_bot_action_broker(self.action_broker)  # This seems to only work after the bot hot reloads once, weird.
 
-			Thread(target=self.heartbeat_connection_attempts_to_twitch_broker, args=(port,)).start()
+			Thread(target=self.heartbeat_connection_attempts_to_twitch_broker, args=(port,), daemon=True).start()
 
 		while True:
 			sleep(0)
