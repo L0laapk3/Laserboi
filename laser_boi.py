@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from rlutilities.linear_algebra import euler_to_rotation, dot, transpose, look_at, vec2, vec3, norm, normalize, angle_between, orthogonalize, project
 from rlutilities.simulation import Ball, Field, Game, Car, ray as Ray
 from rlutilities.mechanics import ReorientML
-import math, fastrand
+import math, random
 
 PUSH_STRENGTH_BALL = BASE_PUSH_STRENGTH * 4
 PUSH_STRENGTH_BALL_ANGULAR = BASE_PUSH_STRENGTH * 20
@@ -155,7 +155,7 @@ class Laserboi(BaseScript):
 				self.isPaused = False
 			
 			ballTouchers = []
-			fastrand.pcg32_seed(int(packet.game_info.seconds_elapsed / .14))
+			random.seed(a=int(packet.game_info.seconds_elapsed / .14))
 
 			if DURING_BOOST_ONLY:
 				boosting = {}
@@ -256,7 +256,7 @@ class Laserboi(BaseScript):
 								self.renderer.draw_line_3d(startPoint + offset, startPoint + offset + closest * direction, color)
 							
 							for _ in range(SCATTERLINES):
-								r = fastrand.pcg32bounded(int(2 * math.pi * 2**10)) / 2**10
+								r = random.uniform(0, 2 * math.pi)
 								c = leftRight * r - (SCATTERSPIN - COLORSPIN) * packet.game_info.seconds_elapsed
 								i = packet.game_cars[index].physics.rotation.roll + r - leftRight * (SCATTERSPIN) * packet.game_info.seconds_elapsed
 								# c = random.uniform(0, 2 * math.pi)
@@ -265,7 +265,7 @@ class Laserboi(BaseScript):
 									int(255 * (0.5 + 0.5 * math.sin(c + 2 / 3 * math.pi))),
 									int(255 * (0.5 + 0.5 * math.sin(c + 4 / 3 * math.pi)))
 								)
-								length = 15 * math.exp(-fastrand.pcg32bounded(2**10) / 2**10)
+								length = 15 * random.expovariate(1)
 								scatterStart = startPoint + closest * direction + dot(look_at(direction, vec3(0, 0, 1)), vec3(0, R * math.sin(i), R * math.cos(i)))
 								scatterEnd = scatterStart + dot(look_at(endVector, vec3(0, 0, 1)), vec3(-length, length * math.sin(i), length * math.cos(i)))
 								self.renderer.draw_line_3d(scatterStart, scatterEnd, color)
