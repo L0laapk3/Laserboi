@@ -10,8 +10,8 @@ LASER_DURATION = 5
 ALLOW_MULTIPLE_AT_ONCE = True
 
 
+# You shouldn't need to change these
 BASE_PUSH_STRENGTH = 9001
-
 
 LASERLINES = 60
 SCATTERLINES = 30
