@@ -19,9 +19,8 @@ from rlbot_twitch_broker_client import Configuration, RegisterApi, ApiClient, Ac
 from rlbot_twitch_broker_client.defaults import STANDARD_TWITCH_BROKER_PORT
 from urllib3.exceptions import MaxRetryError
 
-from rlutilities.linear_algebra import euler_to_rotation, dot, transpose, look_at, vec2, vec3, norm, normalize, angle_between, orthogonalize, project
-from rlutilities.simulation import Ball, Field, Game, Car, ray as Ray
-from rlutilities.mechanics import ReorientML
+from rlutilities.linear_algebra import vec3, norm
+from rlutilities.simulation import Field, Game, ray as Ray
 
 from util.vec import Vec3
 from util.orientation import Orientation, look_at_orientation
@@ -154,8 +153,6 @@ class Laserboi(BaseScript):
 				print("ticks this second:", self.ticksThisSecond)
 				self.ticksThisSecond = 0
 				self.lastFullSecond = int(packet.game_info.seconds_elapsed)
-			
-			self.game.read_game_information(packet, None)
 
 			if TWITCH_CHAT_INTERACTION:
 				self.car_lasers = {k:v for k, v in self.car_lasers.items() if v.time_remaining >= 0}
