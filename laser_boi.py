@@ -205,7 +205,7 @@ class Laserboi(BaseScript):
 								startPoint = car_pos + car_ori.forward * 63 - leftRight * car_ori.right * 26 + car_ori.up * 3
 								direction = car_ori.forward.orthogonalize(Vec3(0, 0, 1)).normalized() if car.has_wheel_contact and abs(car_ori.up.dot(Vec3(0, 0, 1))) > 0.999 else car_ori.forward
 
-								for bounce in range(1):
+								for bounce in range(BOUNCE_SEGMENTS):
 									closest = math.inf
 									closestTarget = None
 									toBall = Vec3(packet.game_ball.physics.location) - car_pos
