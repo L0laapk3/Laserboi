@@ -25,6 +25,7 @@ from rlutilities.simulation import Field, Game, ray as Ray
 from util.vec import Vec3
 from util.orientation import Orientation, look_at_orientation
 
+
 BALL_RADIUS = 93.15
 HITBOX_HALF_WIDTHS = Vec3(59.00368881, 42.09970474, 18.07953644)
 HITBOX_OFFSET = Vec3(13.97565993, 0.0, 20.75498772)
@@ -136,6 +137,7 @@ class Laserboi(BaseScript):
 		while True:
 			sleep(0)
 			packet = self.wait_game_tick_packet()
+			
 			raw_players = [self.game_tick_packet.game_cars[i]
 						   for i in range(packet.num_cars)]
 			self.known_players = [p for p in raw_players if p.name]
@@ -275,15 +277,22 @@ class Laserboi(BaseScript):
 									R = 4
 									COLORSPIN = 2
 									SCATTERSPIN = 0.75
+
+									dir_ori = look_at_orientation(direction, Vec3(0, 0, 1))
+									dir_ori.right *= R
+									dir_ori.up *= R
+									end_ori = look_at_orientation(endVector, Vec3(0, 0, 1))
+									scatterStartFirst = startPoint + closest * direction
+
 									for i in range(LASERLINES):
 										i = i / LASERLINES * 2 * math.pi
-										offset = look_at_orientation(direction, Vec3(0, 0, 1)).dot1(Vec3(0, R * math.sin(i), R * math.cos(i)))
+										offset = dir_ori.right * math.sin(i) + dir_ori.up * math.cos(i)
 										color = self.renderer.create_color(255, 
 											int(255 * (0.5 + 0.5 * math.sin(car.physics.rotation.roll + leftRight * i + (COLORSPIN * packet.game_info.seconds_elapsed)))),
 											int(255 * (0.5 + 0.5 * math.sin(car.physics.rotation.roll + leftRight * i + (COLORSPIN * packet.game_info.seconds_elapsed + 2 / 3 * math.pi)))),
 											int(255 * (0.5 + 0.5 * math.sin(car.physics.rotation.roll + leftRight * i + (COLORSPIN * packet.game_info.seconds_elapsed + 4 / 3 * math.pi))))
 										)
-										self.renderer.draw_line_3d(startPoint + offset, startPoint + offset + closest * direction, color)
+										self.renderer.draw_line_3d(startPoint + offset, scatterStartFirst + offset, color)
 									
 									for _ in range(SCATTERLINES):
 										r = random.uniform(0, 2 * math.pi)
@@ -296,8 +305,8 @@ class Laserboi(BaseScript):
 											int(255 * (0.5 + 0.5 * math.sin(c + 4 / 3 * math.pi)))
 										)
 										length = 15 * random.expovariate(1)
-										scatterStart = startPoint + closest * direction + look_at_orientation(direction, Vec3(0, 0, 1)).dot1(Vec3(0, R * math.sin(i), R * math.cos(i)))
-										scatterEnd = scatterStart +look_at_orientation(endVector, Vec3(0, 0, 1)).dot1(Vec3(-length, length * math.sin(i), length * math.cos(i)))
+										scatterStart = scatterStartFirst + dir_ori.right * math.sin(i) + dir_ori.up * math.cos(i)
+										scatterEnd = scatterStart + end_ori.dot1(Vec3(-length, length * math.sin(i), length * math.cos(i)))
 										self.renderer.draw_line_3d(scatterStart, scatterEnd, color)
 									
 
