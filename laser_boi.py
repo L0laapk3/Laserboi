@@ -71,7 +71,7 @@ class Laserboi(BaseScript):
 		self.known_players: List[PlayerInfo] = []
 		self.game = Game()
 		self.game.set_mode("soccar")
-		self.car_lasers = { }
+		self.car_lasers = { 								}
 		self.last_seconds_elapsed = 0
 		self.forces = {}
 		self.lastScore = 0
