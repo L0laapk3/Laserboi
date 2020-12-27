@@ -56,9 +56,9 @@ class vec2():
 
 """
     @overload
-    def __init__(self, arg0: vec<3>) -> None: ...
-    @overload
     def __init__(self, arg0: float, arg1: float) -> None: ...
+    @overload
+    def __init__(self, arg0: vec<3>) -> None: ...
     def __isub__(self, arg0: vec2) -> vec2: ...
     def __itruediv__(self, arg0: float) -> vec2: ...
     @overload
@@ -78,7 +78,7 @@ class vec3():
     def __iadd__(self, arg0: vec3) -> vec3: ...
     def __imul__(self, arg0: float) -> vec3: ...
     @overload
-    def __init__(self, arg0: vec3) -> None: 
+    def __init__(self, arg0: vec2) -> None: 
         """
 
 
@@ -86,14 +86,14 @@ class vec3():
     @overload
     def __init__(self, arg0: float, arg1: float, arg2: float) -> None: ...
     @overload
-    def __init__(self, arg0: vec2) -> None: ...
+    def __init__(self, arg0: vec3) -> None: ...
     def __isub__(self, arg0: vec3) -> vec3: ...
     def __itruediv__(self, arg0: float) -> vec3: ...
     @overload
-    def __mul__(self, arg0: vec3) -> vec3: 
+    def __mul__(self, arg0: float) -> vec3: 
         pass
     @overload
-    def __mul__(self, arg0: float) -> vec3: ...
+    def __mul__(self, arg0: vec3) -> vec3: ...
     def __rmul__(self, arg0: float) -> vec3: ...
     def __setitem__(self, arg0: int, arg1: float) -> None: ...
     def __str__(self) -> str: ...
@@ -109,18 +109,15 @@ class vec4():
     def __isub__(self, arg0: vec4) -> vec4: ...
     def __itruediv__(self, arg0: float) -> vec4: ...
     @overload
-    def __mul__(self, arg0: float) -> vec4: 
+    def __mul__(self, arg0: vec4) -> vec4: 
         pass
     @overload
-    def __mul__(self, arg0: vec4) -> vec4: ...
+    def __mul__(self, arg0: float) -> vec4: ...
     def __rmul__(self, arg0: float) -> vec4: ...
     def __setitem__(self, arg0: int, arg1: float) -> None: ...
     def __str__(self) -> str: ...
     def __sub__(self, arg0: vec4) -> vec4: ...
     def __truediv__(self, arg0: float) -> vec4: ...
-    pass
-@overload
-def angle_between(arg0: mat3, arg1: mat3) -> float:
     pass
 @overload
 def angle_between(arg0: vec3, arg1: vec3) -> float:
@@ -129,10 +126,13 @@ def angle_between(arg0: vec3, arg1: vec3) -> float:
 def angle_between(arg0: vec2, arg1: vec2) -> float:
     pass
 @overload
-def atan2(arg0: vec2) -> float:
+def angle_between(arg0: mat3, arg1: mat3) -> float:
     pass
 @overload
 def atan2(arg0: vec3) -> float:
+    pass
+@overload
+def atan2(arg0: vec2) -> float:
     pass
 def axis_to_rotation(arg0: vec3) -> mat3:
     pass
@@ -143,31 +143,19 @@ def clip(arg0: float, arg1: float, arg2: float) -> float:
 def clip(arg0: int, arg1: int, arg2: int) -> int:
     pass
 @overload
-def cross(arg0: vec2) -> vec2:
+def cross(arg0: vec3) -> vec3:
     pass
 @overload
 def cross(arg0: vec3, arg1: vec3) -> vec3:
     pass
 @overload
-def cross(arg0: vec3) -> vec3:
-    pass
-@overload
-def dot(arg0: mat3, arg1: mat3) -> mat3:
-    pass
-@overload
-def dot(arg0: vec2, arg1: vec2) -> float:
-    pass
-@overload
-def dot(arg0: mat3, arg1: vec3) -> vec3:
-    pass
-@overload
-def dot(arg0: vec3, arg1: mat3) -> vec3:
+def cross(arg0: vec2) -> vec2:
     pass
 @overload
 def dot(arg0: vec2, arg1: mat2) -> vec2:
     pass
 @overload
-def dot(arg0: mat2, arg1: mat2) -> mat2:
+def dot(arg0: mat3, arg1: mat3) -> mat3:
     pass
 @overload
 def dot(arg0: vec3, arg1: vec3) -> float:
@@ -177,6 +165,18 @@ def dot(arg0: mat2, arg1: vec2) -> vec2:
     pass
 @overload
 def dot(arg0: vec4, arg1: vec4) -> float:
+    pass
+@overload
+def dot(arg0: vec3, arg1: mat3) -> vec3:
+    pass
+@overload
+def dot(arg0: mat3, arg1: vec3) -> vec3:
+    pass
+@overload
+def dot(arg0: vec2, arg1: vec2) -> float:
+    pass
+@overload
+def dot(arg0: mat2, arg1: mat2) -> mat2:
     pass
 def euler_to_rotation(arg0: vec3) -> mat3:
     pass
