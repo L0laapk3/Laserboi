@@ -9,7 +9,7 @@ import random
 
 from rlbot.agents.base_script import BaseScript
 from rlbot.utils.game_state_util import CarState, GameState, BallState, Physics, Vector3
-from rlbot.utils.structures.game_data_struct import PlayerInfo
+from rlbot.utils.structures.game_data_struct import Vector3 as DrawVector3, PlayerInfo
 
 from rlbot_action_server.bot_action_broker import BotActionBroker, run_action_server, find_usable_port
 from rlbot_action_server.bot_holder import set_bot_action_broker
@@ -52,7 +52,10 @@ class Laser:
 	time_remaining: float
 
 def toVector3(v: 'Vec3'):
-	return Vector3(v[0], v[1], v[2])
+	return Vector3(v.x, v.y, v.z)
+
+def toDrawVector3(v: 'Vec3'):
+	return DrawVector3(v.x, v.y, v.z)
 	
 def toRLU(v: 'Vec3') -> 'vec3':
 	return vec3(v.x, v.y, v.z)
@@ -292,7 +295,7 @@ class Laserboi(BaseScript):
 											int(255 * (0.5 + 0.5 * math.sin(car.physics.rotation.roll + leftRight * i + (COLORSPIN * packet.game_info.seconds_elapsed + 2 / 3 * math.pi)))),
 											int(255 * (0.5 + 0.5 * math.sin(car.physics.rotation.roll + leftRight * i + (COLORSPIN * packet.game_info.seconds_elapsed + 4 / 3 * math.pi))))
 										)
-										self.renderer.draw_line_3d(startPoint + offset, scatterStartFirst + offset, color)
+										self.renderer.native_draw_line_3d(self.renderer.builder, color, toDrawVector3(startPoint + offset), toDrawVector3(scatterStartFirst + offset))
 									
 									for _ in range(SCATTERLINES):
 										r = random.uniform(0, 2 * math.pi)
@@ -307,8 +310,7 @@ class Laserboi(BaseScript):
 										length = 15 * random.expovariate(1)
 										scatterStart = scatterStartFirst + dir_ori.right * math.sin(i) + dir_ori.up * math.cos(i)
 										scatterEnd = scatterStart + end_ori.dot1(Vec3(-length, length * math.sin(i), length * math.cos(i)))
-										self.renderer.draw_line_3d(scatterStart, scatterEnd, color)
-									
+										self.renderer.native_draw_line_3d(self.renderer.builder, color, toDrawVector3(scatterStart), toDrawVector3(scatterEnd))
 
 									if closestTarget is not None:
 										break
